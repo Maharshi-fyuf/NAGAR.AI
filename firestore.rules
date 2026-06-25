@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /issues/{issueId} {
+      // Anyone can read issues (public map)
+      allow read: if true;
+      // Must be signed in to create
+      allow create: if request.auth != null
+        && request.resource.data.reportedBy == request.auth.uid;
+      // Owner can update, or any signed-in user can update upvotes/verificationCount only
+      allow update: if request.auth != null && (
+        resource.data.reportedBy == request.auth.uid ||
+        onlyUpdatingVoteFields(request)
+      );
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    function onlyUpdatingVoteFields(req) {
+      let allowed = ['upvotes', 'verificationCount', 'updatedAt', 'status', 'timeline', 'complaintLetter'];
+      return req.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+  }
+}
