@@ -3,6 +3,19 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_GEMINI_API_KEY',
+  'VITE_GOOGLE_MAPS_API_KEY',
+  'VITE_IMGBB_API_KEY',
+];
+requiredEnvVars.forEach((key) => {
+  if (!import.meta.env[key]) {
+    console.error(`Missing required env var: ${key}`);
+  }
+});
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,

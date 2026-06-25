@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardStats } from '../lib/firestore';
+import { seedIssues } from '../lib/seedData';
+import { useAuth } from '../context/AuthContext';
 import { TrendingUp, CheckCircle, Clock, AlertTriangle, Loader2 } from 'lucide-react';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -22,6 +24,17 @@ const SEVERITY_COLORS: Record<string, string> = {
 export default function DashboardPage() {
   const [stats, setStats] = useState<Awaited<ReturnType<typeof getDashboardStats>> | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [seeding, setSeeding] = useState(false);
+  const [seeded, setSeeded] = useState(false);
+
+  const handleSeed = async () => {
+    if (!user) return;
+    setSeeding(true);
+    await seedIssues(user.uid);
+    setSeeding(false);
+    setSeeded(true);
+  };
 
   useEffect(() => {
     getDashboardStats().then((s) => {
@@ -47,6 +60,18 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      {!seeded && (
+        <button
+          onClick={handleSeed}
+          disabled={seeding}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 rounded-xl text-sm transition-colors"
+        >
+          {seeding ? '⏳ Seeding demo data...' : '🌱 Seed 10 Demo Issues (one time only)'}
+        </button>
+      )}
+      {seeded && (
+        <p className="text-green-400 text-sm text-center">✅ Demo issues seeded! Refresh the map.</p>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Impact Dashboard</h1>
         <p className="text-slate-400 text-sm mt-1">Community civic issue tracker</p>

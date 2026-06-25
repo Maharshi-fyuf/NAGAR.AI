@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NagarAI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--orange:#f97316;--orange-dim:#7c3a0e;--bg:#060a14;--surface:#0c1524;--border:#1a2744}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-x:hidden;cursor:default}
+
+/* ── GRAIN OVERLAY ── */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:grain 4s steps(8) infinite}
+@keyframes grain{0%,100%{transform:translate(0,0)}12%{transform:translate(-5%,-8%)}25%{transform:translate(10%,4%)}37%{transform:translate(-3%,12%)}50%{transform:translate(8%,-6%)}62%{transform:translate(-12%,3%)}75%{transform:translate(4%,-10%)}87%{transform:translate(-8%,7%)}}
+
+/* ── ORB BG ── */
+.orbs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.18}
+.orb1{width:700px;height:700px;background:radial-gradient(circle,#f97316,transparent 70%);top:-200px;left:-200px;animation:drift1 18s ease-in-out infinite}
+.orb2{width:500px;height:500px;background:radial-gradient(circle,#1d4ed8,transparent 70%);bottom:-100px;right:-100px;animation:drift2 22s ease-in-out infinite}
+.orb3{width:400px;height:400px;background:radial-gradient(circle,#7c3aed,transparent 70%);top:40%;left:60%;animation:drift3 25s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0)}50%{transform:translate(80px,60px)}}
+@keyframes drift2{0%,100%{transform:translate(0,0)}50%{transform:translate(-60px,-80px)}}
+@keyframes drift3{0%,100%{transform:translate(0,0)}33%{transform:translate(-50px,40px)}66%{transform:translate(40px,-30px)}}
+
+/* ── NAVBAR ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 48px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(to bottom,rgba(6,10,20,.9),transparent);backdrop-filter:blur(0)}
+.nav-logo{font-size:20px;font-weight:800;letter-spacing:-.02em}
+.nav-logo span{color:var(--orange)}
+.nav-links{display:flex;gap:32px;font-size:14px;color:#64748b}
+.nav-links a{color:#64748b;text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:#f1f5f9}
+.nav-cta{background:var(--orange);color:#fff;font-size:13px;font-weight:600;padding:9px 20px;border-radius:8px;text-decoration:none;transition:background .2s}
+.nav-cta:hover{background:#ea6c0a}
+
+/* ── HERO ── */
+.hero{height:100vh;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;z-index:1}
+.hero-bg-grid{position:absolute;inset:0;pointer-events:none}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#f97316;margin-bottom:32px;opacity:0;transform:translateY(16px);animation:revealUp .8s .2s ease forwards}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#f97316;animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(249,115,22,.4)}50%{opacity:.4;box-shadow:0 0 0 6px rgba(249,115,22,0)}}
+@keyframes revealUp{to{opacity:1;transform:translateY(0)}}
+
+.hero-headline{text-align:center;line-height:.95;letter-spacing:-.04em;margin-bottom:28px}
+.hero-headline .row1{display:block;font-size:clamp(56px,10vw,120px);font-weight:900;color:#f1f5f9;opacity:0;transform:translateY(24px);animation:revealUp .8s .4s ease forwards}
+.hero-headline .row2{display:block;font-size:clamp(56px,10vw,120px);font-weight:900;color:var(--orange);opacity:0;transform:translateY(24px);animation:revealUp .8s .6s ease forwards;position:relative}
+.hero-headline .row2::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:3px;background:var(--orange);transform:scaleX(0);transform-origin:left;animation:lineReveal .6s 1.2s ease forwards}
+@keyframes lineReveal{to{transform:scaleX(1)}}
+.hero-headline .row3{display:block;font-size:clamp(56px,10vw,120px);font-weight:900;color:#f1f5f9;opacity:0;transform:translateY(24px);animation:revealUp .8s .8s ease forwards}
+
+.hero-sub{font-size:clamp(15px,1.6vw,18px);color:#64748b;max-width:500px;text-align:center;line-height:1.7;margin-bottom:44px;opacity:0;transform:translateY(16px);animation:revealUp .8s 1s ease forwards}
+.hero-sub b{color:#94a3b8;font-weight:500}
+
+.hero-ctas{display:flex;gap:12px;opacity:0;transform:translateY(16px);animation:revealUp .8s 1.1s ease forwards}
+.btn-p{background:var(--orange);color:#fff;font-size:14px;font-weight:600;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:all .2s;border:none;cursor:pointer}
+.btn-p:hover{background:#ea6c0a;transform:translateY(-2px);box-shadow:0 12px 32px rgba(249,115,22,.3)}
+.btn-g{background:transparent;color:#94a3b8;font-size:14px;font-weight:500;padding:14px 28px;border-radius:10px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);transition:all .2s}
+.btn-g:hover{border-color:#334155;color:#f1f5f9}
+
+/* floating markers */
+.fmarker{position:absolute;pointer-events:none;will-change:transform}
+.fm-dot{border-radius:50%;position:relative}
+.fm-ring{position:absolute;top:50%;left:50%;border-radius:50%;animation:ringOut 2.5s ease-in-out infinite;transform:translate(-50%,-50%)}
+@keyframes ringOut{0%{transform:translate(-50%,-50%) scale(.5);opacity:.7}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
+.fm-label{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:4px;opacity:.8}
+
+.scroll-prompt{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;color:#334155;font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.scroll-bar{width:1px;height:48px;background:linear-gradient(to bottom,var(--orange),transparent);animation:scrollAnim 1.8s ease-in-out infinite}
+@keyframes scrollAnim{0%{opacity:0;transform:scaleY(0);transform-origin:top}40%{opacity:1}100%{opacity:0;transform:scaleY(1);transform-origin:top}}
+
+/* ── STICKY HOW IT WORKS ── */
+.sticky-wrap{height:300vh;position:relative}
+.sticky-inner{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.steps-container{width:100%;max-width:1200px;margin:0 auto;padding:0 48px;position:relative}
+.step-panel{position:absolute;top:50%;left:48px;right:48px;transform:translateY(-50%);display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;opacity:0;transition:opacity .4s,transform .4s;pointer-events:none}
+.step-panel.active{opacity:1;pointer-events:auto}
+.step-panel.exit-left{transform:translateY(-50%) translateX(-40px)}
+.step-num-big{font-size:160px;font-weight:900;line-height:1;letter-spacing:-.06em;color:transparent;-webkit-text-stroke:1px rgba(249,115,22,.15);user-select:none;margin-bottom:-20px}
+.step-tag{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:20px}
+.step-title{font-size:clamp(36px,4vw,56px);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin-bottom:20px;color:#f1f5f9}
+.step-desc{font-size:16px;color:#64748b;line-height:1.75;margin-bottom:28px}
+.step-chip{display:inline-flex;align-items:center;gap:8px;background:#0c1524;border:1px solid var(--border);padding:8px 16px;border-radius:8px;font-size:13px;color:#94a3b8}
+.step-visual{background:var(--surface);border:1px solid var(--border);border-radius:20px;height:360px;display:flex;align-items:center;justify-content:center;font-size:80px;position:relative;overflow:hidden}
+.step-visual::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(249,115,22,.08),transparent 60%)}
+.progress-bar-wrap{position:absolute;right:48px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:16px;align-items:center}
+.prog-dot{width:8px;height:8px;border-radius:50%;border:1px solid var(--border);transition:all .3s;cursor:pointer}
+.prog-dot.active{background:var(--orange);border-color:var(--orange);box-shadow:0 0 12px rgba(249,115,22,.5)}
+.prog-line{width:1px;height:32px;background:var(--border)}
+.step-counter{position:absolute;bottom:40px;left:48px;font-size:13px;color:#334155;letter-spacing:.06em}
+.step-counter span{color:#64748b}
+
+/* ── STATS STRIP ── */
+.stats-strip{padding:80px 48px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr)}
+.stat-item{padding:32px 40px;border-right:1px solid var(--border);text-align:left}
+.stat-item:last-child{border-right:none}
+.stat-big{font-size:64px;font-weight:900;letter-spacing:-.04em;line-height:1;color:#f1f5f9;margin-bottom:8px}
+.stat-big span{color:var(--orange)}
+.stat-lbl{font-size:13px;color:#475569;font-weight:500;text-transform:uppercase;letter-spacing:.08em}
+
+/* ── TECH ── */
+.tech-sec{padding:80px 48px;text-align:center}
+.tech-sec p{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#334155;margin-bottom:28px}
+.tech-row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.t-pill{display:flex;align-items:center;gap:8px;padding:10px 20px;border-radius:100px;border:1px solid var(--border);background:var(--surface);font-size:13px;font-weight:500;color:#64748b;transition:all .2s}
+.t-pill:hover{border-color:#334155;color:#94a3b8}
+.t-dot{width:7px;height:7px;border-radius:50%}
+
+/* ── FINAL CTA ── */
+.final{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 48px;position:relative;overflow:hidden}
+.final::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 100%,rgba(249,115,22,.12),transparent 60%)}
+.final-small{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#f97316;margin-bottom:24px}
+.final h2{font-size:clamp(40px,6vw,72px);font-weight:900;letter-spacing:-.03em;line-height:1;margin-bottom:16px}
+.final p{color:#475569;font-size:17px;margin-bottom:40px}
+.city-line{margin-top:80px;display:flex;align-items:center;gap:24px;color:#1e293b;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+.city-line::before,.city-line::after{content:'';flex:1;height:1px;background:var(--border)}
+</style>
+</head>
+<body>
+
+<div class="orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Nagar<span>AI</span></div>
+  <div class="nav-links">
+    <a href="#">Map</a>
+    <a href="#">Dashboard</a>
+    <a href="#">About</a>
+  </div>
+  <a href="#" class="nav-cta">Report an Issue →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <canvas id="bgCanvas" class="hero-bg-grid"></canvas>
+
+  <!-- Floating issue markers with parallax -->
+  <div class="fmarker" id="m1" style="top:20%;left:12%">
+    <div class="fm-dot" style="width:14px;height:14px;background:#ef4444"></div>
+    <div class="fm-ring" style="width:28px;height:28px;border:1.5px solid #ef4444;animation-delay:0s"></div>
+    <div class="fm-label" style="background:rgba(239,68,68,.15);color:#f87171">CRITICAL</div>
+  </div>
+  <div class="fmarker" id="m2" style="top:30%;right:14%">
+    <div class="fm-dot" style="width:12px;height:12px;background:#f97316"></div>
+    <div class="fm-ring" style="width:24px;height:24px;border:1.5px solid #f97316;animation-delay:.8s"></div>
+    <div class="fm-label" style="background:rgba(249,115,22,.15);color:#fb923c">POTHOLE</div>
+  </div>
+  <div class="fmarker" id="m3" style="bottom:28%;left:18%">
+    <div class="fm-dot" style="width:10px;height:10px;background:#facc15"></div>
+    <div class="fm-ring" style="width:20px;height:20px;border:1.5px solid #facc15;animation-delay:1.4s"></div>
+    <div class="fm-label" style="background:rgba(250,204,21,.15);color:#fde047">STREETLIGHT</div>
+  </div>
+  <div class="fmarker" id="m4" style="bottom:22%;right:20%">
+    <div class="fm-dot" style="width:11px;height:11px;background:#22c55e"></div>
+    <div class="fm-ring" style="width:22px;height:22px;border:1.5px solid #22c55e;animation-delay:2s"></div>
+    <div class="fm-label" style="background:rgba(34,197,94,.15);color:#4ade80">VERIFIED</div>
+  </div>
+  <div class="fmarker" id="m5" style="top:55%;left:7%">
+    <div class="fm-dot" style="width:9px;height:9px;background:#38bdf8"></div>
+    <div class="fm-ring" style="width:18px;height:18px;border:1.5px solid #38bdf8;animation-delay:.4s"></div>
+  </div>
+
+  <div class="hero-content" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center">
+    <div class="hero-eyebrow"><div class="live-dot"></div>Live · Ahmedabad, Gujarat</div>
+    <div class="hero-headline">
+      <span class="row1">Photograph it.</span>
+      <span class="row2">AI fixes it.</span>
+      <span class="row3">City thanks you.</span>
+    </div>
+    <p class="hero-sub">Gemini Vision identifies the civic issue. Google Maps pins it. A formal complaint is drafted — automatically. <b>No paperwork. No bureaucracy.</b></p>
+    <div class="hero-ctas">
+      <a href="/map" class="btn-p">🗺 Explore the Map</a>
+      <a href="/report" class="btn-g">📸 Report an Issue →</a>
+    </div>
+  </div>
+
+  <div class="scroll-prompt"><div class="scroll-bar"></div>SCROLL</div>
+</section>
+
+<!-- STICKY HOW IT WORKS -->
+<div class="sticky-wrap" id="stickyWrap">
+  <div class="sticky-inner">
+    <div class="steps-container">
+
+      <!-- Panel 1 -->
+      <div class="step-panel active" id="panel0">
+        <div>
+          <div class="step-num-big">01</div>
+          <div class="step-tag">Step 1 · Perceive</div>
+          <h2 class="step-title">Gemini sees what you see</h2>
+          <p class="step-desc">Point your phone at any civic problem. Gemini Vision 2.5 Flash analyzes the image in under 2 seconds — detecting category, severity, and the exact authority responsible.</p>
+          <div class="step-chip">🔷 Gemini Vision 2.5 Flash API</div>
+        </div>
+        <div class="step-visual">📸
+          <div style="position:absolute;bottom:24px;left:24px;right:24px;background:rgba(6,10,20,.9);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px">
+            <div style="color:#f97316;font-weight:600;margin-bottom:4px">AI Analysis Complete</div>
+            <div style="color:#64748b">Category: <span style="color:#94a3b8">Pothole · Critical</span></div>
+            <div style="color:#64748b">Authority: <span style="color:#94a3b8">PWD Department</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 2 -->
+      <div class="step-panel" id="panel1">
+        <div>
+          <div class="step-num-big">02</div>
+          <div class="step-tag">Step 2 · Reason</div>
+          <h2 class="step-title">AI routes it to the right authority</h2>
+          <p class="step-desc">The agent determines routing — Municipal Corporation, PWD, Water Board, or Electricity Board. Your GPS coordinates are reverse-geocoded and the issue appears live on the city map.</p>
+          <div class="step-chip">🗺 Google Maps JS API + Geocoding</div>
+        </div>
+        <div class="step-visual">🗺️
+          <div style="position:absolute;top:24px;right:24px;background:rgba(6,10,20,.9);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:8px 12px;font-size:11px;color:#fb923c">📍 Maninagar Cross Roads</div>
+          <div style="position:absolute;bottom:24px;left:24px;background:rgba(6,10,20,.9);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:12px;color:#64748b">Routing to → <span style="color:#38bdf8">Municipal Corporation</span></div>
+        </div>
+      </div>
+
+      <!-- Panel 3 -->
+      <div class="step-panel" id="panel2">
+        <div>
+          <div class="step-num-big">03</div>
+          <div class="step-tag">Step 3 · Act</div>
+          <h2 class="step-title">Complaint letter, drafted instantly</h2>
+          <p class="step-desc">A formal complaint letter is generated for the relevant authority — ready to copy and email in one tap. Community verifies via upvotes. Three verifications auto-escalates the issue status.</p>
+          <div class="step-chip">✅ Community-verified · Auto-escalated</div>
+        </div>
+        <div class="step-visual">📨
+          <div style="position:absolute;inset:16px;background:rgba(6,10,20,.95);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:11px;color:#475569;line-height:1.8;overflow:hidden">
+            <div style="color:#94a3b8;margin-bottom:8px;font-weight:600">COMPLAINT LETTER · GENERATED</div>
+            To: The Commissioner<br>Municipal Corporation of Ahmedabad<br><br>
+            <span style="color:#64748b">Subject: Urgent — Critical Pothole at Maninagar Cross Roads requiring immediate repair...</span>
+            <div style="position:absolute;bottom:16px;right:16px;background:var(--orange);color:#fff;font-size:11px;font-weight:600;padding:6px 12px;border-radius:6px">Copy Letter</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress dots -->
+      <div class="progress-bar-wrap" id="progressBar">
+        <div class="prog-dot active" data-panel="0"></div>
+        <div class="prog-line"></div>
+        <div class="prog-dot" data-panel="1"></div>
+        <div class="prog-line"></div>
+        <div class="prog-dot" data-panel="2"></div>
+      </div>
+
+      <div class="step-counter">Step <span id="stepCounterNum">01</span> / 03</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-strip">
+  <div class="stat-item"><div class="stat-big"><span class="cnt" data-t="10">0</span><span style="color:#f97316">+</span></div><div class="stat-lbl">Issues Mapped</div></div>
+  <div class="stat-item"><div class="stat-big"><span class="cnt" data-t="3">0</span></div><div class="stat-lbl">AI Agent Steps</div></div>
+  <div class="stat-item"><div class="stat-big"><span class="cnt" data-t="6">0</span></div><div class="stat-lbl">Issue Categories</div></div>
+  <div class="stat-item"><div class="stat-big"><span class="cnt" data-t="2">0</span><span style="color:var(--orange)">s</span></div><div class="stat-lbl">AI Analysis Time</div></div>
+</div>
+
+<!-- TECH -->
+<div class="tech-sec">
+  <p>Built with Google Technologies</p>
+  <div class="tech-row">
+    <div class="t-pill"><div class="t-dot" style="background:#f97316"></div>Gemini 2.5 Flash</div>
+    <div class="t-pill"><div class="t-dot" style="background:#3b82f6"></div>Firebase Firestore</div>
+    <div class="t-pill"><div class="t-dot" style="background:#22c55e"></div>Google Maps JS API</div>
+    <div class="t-pill"><div class="t-dot" style="background:#06b6d4"></div>Geocoding API</div>
+    <div class="t-pill"><div class="t-dot" style="background:#ef4444"></div>Firebase Auth</div>
+    <div class="t-pill"><div class="t-dot" style="background:#facc15"></div>Firebase Hosting</div>
+    <div class="t-pill"><div class="t-dot" style="background:#8b5cf6"></div>Google Sign-In</div>
+  </div>
+</div>
+
+<!-- FINAL CTA -->
+<div class="final">
+  <div class="final-small">Join the movement</div>
+  <h2>Fix <span style="color:var(--orange)">Ahmedabad.</span><br>One photo at a time.</h2>
+  <p>Citizens are already reporting. Be the first to verify.</p>
+  <a href="/map" class="btn-p" style="font-size:16px;padding:16px 36px">Enter NagarAI →</a>
+  <div class="city-line">Vibe2Ship Hackathon · Coding Ninjas × Google for Developers · 2026</div>
+</div>
+
+<script>
+// ── CANVAS BACKGROUND ──
+const cv = document.getElementById('bgCanvas');
+const cx = cv.getContext('2d');
+let cW, cH, pts = [];
+function resizeCV(){
+  cW = cv.width = window.innerWidth;
+  cH = cv.height = window.innerHeight;
+  pts = [];
+  for(let i = 0; i < 120; i++){
+    pts.push({x:Math.random()*cW, y:Math.random()*cH, vx:(Math.random()-.5)*.15, vy:(Math.random()-.5)*.15, r:Math.random()*1.5+.5, a:Math.random()});
+  }
+}
+function drawCV(){
+  cx.clearRect(0,0,cW,cH);
+  // Grid
+  cx.strokeStyle='rgba(26,39,68,.35)';cx.lineWidth=.5;
+  for(let x=0;x<cW;x+=80){cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,cH);cx.stroke()}
+  for(let y=0;y<cH;y+=80){cx.beginPath();cx.moveTo(0,y);cx.lineTo(cW,y);cx.stroke()}
+  // Connect nearby points
+  for(let i=0;i<pts.length;i++){
+    for(let j=i+1;j<pts.length;j++){
+      const dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<120){cx.strokeStyle=`rgba(26,39,68,${(1-d/120)*.4})`;cx.lineWidth=.5;cx.beginPath();cx.moveTo(pts[i].x,pts[i].y);cx.lineTo(pts[j].x,pts[j].y);cx.stroke()}
+    }
+  }
+  pts.forEach(p=>{
+    p.x=(p.x+p.vx+cW)%cW; p.y=(p.y+p.vy+cH)%cH;
+    cx.beginPath();cx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    cx.fillStyle=`rgba(100,116,139,${p.a*.4})`;cx.fill();
+  });
+  requestAnimationFrame(drawCV);
+}
+resizeCV(); drawCV();
+window.addEventListener('resize', resizeCV);
+
+// ── PARALLAX MARKERS ──
+const markers = [
+  {el:document.getElementById('m1'), speed:.08},
+  {el:document.getElementById('m2'), speed:.13},
+  {el:document.getElementById('m3'), speed:.06},
+  {el:document.getElementById('m4'), speed:.1},
+  {el:document.getElementById('m5'), speed:.15},
+];
+
+// ── STICKY SCROLL ──
+const panels = [
+  document.getElementById('panel0'),
+  document.getElementById('panel1'),
+  document.getElementById('panel2'),
+];
+const dots = document.querySelectorAll('.prog-dot');
+const stepNum = document.getElementById('stepCounterNum');
+const nums = ['01','02','03'];
+let currentPanel = 0;
+
+function setPanel(n){
+  if(n === currentPanel) return;
+  panels[currentPanel].classList.remove('active');
+  panels[currentPanel].classList.add('exit-left');
+  setTimeout(()=>panels[currentPanel].classList.remove('exit-left'), 400);
+  currentPanel = n;
+  panels[currentPanel].classList.add('active');
+  dots.forEach((d,i)=>d.classList.toggle('active',i===n));
+  stepNum.textContent = nums[n];
+}
+
+dots.forEach(d=>d.addEventListener('click',()=>setPanel(parseInt(d.dataset.panel))));
+
+// ── SCROLL HANDLER ──
+let statsAnimated = false;
+function onScroll(){
+  const sy = window.scrollY;
+  
+  // Parallax markers
+  markers.forEach(m=>{m.el.style.transform=`translateY(${-sy*m.speed}px)`});
+  
+  // Sticky section scroll progress
+  const wrap = document.getElementById('stickyWrap');
+  const wTop = wrap.offsetTop;
+  const wH = wrap.offsetHeight - window.innerHeight;
+  const progress = Math.max(0, Math.min(1, (sy - wTop) / wH));
+  const panelIndex = Math.min(2, Math.floor(progress * 3));
+  setPanel(panelIndex);
+  
+  // Stats counter
+  const statsEl = document.querySelector('.stats-strip');
+  if(!statsAnimated && statsEl){
+    const r = statsEl.getBoundingClientRect();
+    if(r.top < window.innerHeight - 100){
+      statsAnimated = true;
+      document.querySelectorAll('.cnt').forEach(el=>{
+        const target = parseInt(el.dataset.t);
+        let n = 0;
+        const step = target / 40;
+        const iv = setInterval(()=>{
+          n = Math.min(n+step, target);
+          el.textContent = Math.floor(n);
+          if(n>=target) clearInterval(iv);
+        }, 30);
+      });
+    }
+  }
+}
+
+window.addEventListener('scroll', onScroll, {passive:true});
+</script>
+</body>
+</html>

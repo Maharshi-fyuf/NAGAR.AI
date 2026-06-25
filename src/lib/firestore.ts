@@ -11,6 +11,7 @@ import {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
+  Timestamp,
   onSnapshot,
   type Unsubscribe,
   where,
@@ -37,7 +38,7 @@ export const uploadIssuePhoto = async (file: File): Promise<string> => {
   return data.data.url;
 };
 
-const compressImage = (file: File): Promise<File> => {
+export const compressImage = (file: File): Promise<File> => {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
@@ -79,7 +80,7 @@ export const createIssue = async (
     timeline: [
       {
         status: 'reported',
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(),
         note: 'Issue reported by citizen',
       },
     ],

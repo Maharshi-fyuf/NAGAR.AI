@@ -55,6 +55,7 @@ export default function ReportPage() {
       setEditedTitle(result.title);
       setEditedDesc(result.description);
     } catch (err) {
+      console.error('GEMINI ERROR:', err); // ADD THIS
       setError('AI analysis failed. Please fill in the details manually.');
       setAnalysis({
         category: 'other',
@@ -73,6 +74,7 @@ export default function ReportPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
+        console.log('GOT COORDS:', lat, lng); // ADD THIS
         // Reverse geocode via Google Maps Geocoding API
         try {
           const res = await fetch(
@@ -100,15 +102,22 @@ export default function ReportPage() {
     setError('');
 
     try {
-      const photoURL = await uploadIssuePhoto(file);
+      const stripHTML = (str: string) => str.replace(/<[^>]*>/g, '').trim();
+      const safeTitle = stripHTML(editedTitle || analysis.title).slice(0, 100);
+      const safeDesc = stripHTML(editedDesc || analysis.description).slice(0, 500);
+
+      const { compressImage } = await import('../lib/firestore');
+      const compressed = await compressImage(file);
+      const photoURL = await uploadIssuePhoto(compressed);
       const finalAnalysis = {
         ...analysis,
-        title: editedTitle || analysis.title,
-        description: editedDesc || analysis.description,
+        title: safeTitle,
+        description: safeDesc,
       };
       const issueId = await createIssue(finalAnalysis, photoURL, location, user.uid);
       navigate(`/issue/${issueId}`);
     } catch (err) {
+      console.error('SUBMIT ERROR:', err); // ADD THIS
       setError('Failed to submit. Please try again.');
       setSubmitting(false);
     }

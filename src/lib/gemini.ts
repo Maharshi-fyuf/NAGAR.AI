@@ -1,7 +1,7 @@
 import type { GeminiAnalysis, Issue } from '../types';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 // Convert File to base64 string
 export const fileToBase64 = (file: File): Promise<string> => {
@@ -58,7 +58,7 @@ Severity guide:
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 500,
+        maxOutputTokens: 1000, // was 500, too low
       },
     }),
   });
@@ -68,9 +68,15 @@ Severity guide:
   }
 
   const data = await response.json();
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const rawText = candidate?.content?.parts?.[0]?.text;
 
   if (!rawText) throw new Error('No response from Gemini');
+
+  // Handle truncated responses (output cut off before JSON was complete)
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    throw new Error('Gemini response was truncated — output token limit hit');
+  }
 
   // Strip any accidental markdown fences
   const clean = rawText.replace(/```json|```/g, '').trim();
