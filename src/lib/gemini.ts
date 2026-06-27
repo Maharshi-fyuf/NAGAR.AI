@@ -1,4 +1,4 @@
-import type { GeminiAnalysis, Issue } from '../types';
+﻿import type { GeminiAnalysis, Issue } from '../types';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -39,32 +39,41 @@ Severity guide:
 - high: significant disruption or safety risk, needs attention in 2-3 days  
 - critical: immediate danger to life or property, needs emergency response`;
 
-  const response = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: imageBase64,
-              },
+  const body = {
+    contents: [
+      {
+        parts: [
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: imageBase64,
             },
-            { text: prompt },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1000, // was 500, too low
+          },
+          { text: prompt },
+        ],
       },
-    }),
-  });
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 2048, // was 500, too low
+    },
+  };
 
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
+  let response;
+  let attempts = 0;
+  while (attempts < 3) {
+    response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (response.status !== 503 && response.status !== 429) break;
+    attempts++;
+    await new Promise(r => setTimeout(r, 2000 * attempts));
+  }
+
+  if (!response!.ok) {
+    throw new Error(`Gemini API error: ${response!.status}`);
   }
 
   const data = await response.json();
@@ -75,7 +84,7 @@ Severity guide:
 
   // Handle truncated responses (output cut off before JSON was complete)
   if (candidate?.finishReason === 'MAX_TOKENS') {
-    throw new Error('Gemini response was truncated — output token limit hit');
+    throw new Error('Gemini response was truncated â€” output token limit hit');
   }
 
   // Strip any accidental markdown fences
@@ -124,7 +133,7 @@ Use "A Concerned Citizen" as the sender name.`;
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.4,
-        maxOutputTokens: 800,
+        maxOutputTokens: 2048,
       },
     }),
   });
@@ -139,3 +148,67 @@ Use "A Concerned Citizen" as the sender name.`;
   if (!letter) throw new Error('No letter generated');
   return letter;
 };
+
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  matchedIssueId: string | null;
+  confidence: number;
+  reason: string;
+}
+
+export async function checkDuplicate(
+  newTitle: string,
+  newDescription: string,
+  candidates: Array<{ id: string; title: string; description: string }>
+): Promise<DuplicateCheckResult> {
+  if (candidates.length === 0) {
+    return { isDuplicate: false, matchedIssueId: null, confidence: 0, reason: 'No nearby issues found' };
+  }
+
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  const prompt = `You are a civic issue duplicate detector. A citizen is reporting a new issue. Check if it is the same as any existing nearby issue.
+
+NEW ISSUE:
+Title: "${newTitle}"
+Description: "${newDescription}"
+
+EXISTING NEARBY ISSUES:
+${candidates.map((c, i) => `[${i + 1}] ID: ${c.id}\nTitle: "${c.title}"\nDescription: "${c.description}"`).join('\n\n')}
+
+Respond with ONLY valid JSON, no markdown, no explanation:
+{
+  "isDuplicate": true or false,
+  "matchedIssueId": "the id of the matching issue or null",
+  "confidence": 0.0 to 1.0,
+  "reason": "one sentence explanation"
+}
+
+Consider it a duplicate only if confidence > 0.75. Different potholes on the same road are NOT duplicates.`;
+
+  const response = await fetch(GEMINI_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 200 },
+    }),
+  });
+
+  if (!response.ok) {
+    return { isDuplicate: false, matchedIssueId: null, confidence: 0, reason: 'Check failed' };
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+  const clean = text.replace(/```json|```/g, '').trim();
+  
+  try {
+    return JSON.parse(clean) as DuplicateCheckResult;
+  } catch {
+    return { isDuplicate: false, matchedIssueId: null, confidence: 0, reason: 'Parse failed' };
+  }
+}
+
+

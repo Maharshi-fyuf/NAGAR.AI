@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback } from 'react';
+﻿import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Camera, Loader2, MapPin, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { analyzeIssueImage, fileToBase64 } from '../lib/gemini';
-import { uploadIssuePhoto, createIssue } from '../lib/firestore';
-import type { GeminiAnalysis, IssueLocation } from '../types';
+import { uploadIssuePhoto, createIssue, findNearbyIssues } from '../lib/firestore';
+import { analyzeIssueImage, fileToBase64, checkDuplicate } from '../lib/gemini';
+import type { GeminiAnalysis, IssueLocation, Issue } from '../types';
 
 const SEVERITY_COLORS = {
   low: 'text-green-400 bg-green-400/10 border-green-400/30',
@@ -14,12 +14,12 @@ const SEVERITY_COLORS = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  pothole: '🕳️ Pothole',
-  streetlight: '💡 Streetlight',
-  garbage: '🗑️ Garbage',
-  water: '💧 Water',
-  drainage: '🌊 Drainage',
-  other: '⚠️ Other',
+  pothole: 'ðŸ•³ï¸ Pothole',
+  streetlight: 'ðŸ’¡ Streetlight',
+  garbage: 'ðŸ—‘ï¸ Garbage',
+  water: 'ðŸ’§ Water',
+  drainage: 'ðŸŒŠ Drainage',
+  other: 'âš ï¸ Other',
 };
 
 type Step = 1 | 2 | 3;
@@ -40,6 +40,12 @@ export default function ReportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [duplicateResult, setDuplicateResult] = useState<{
+    issue: Issue;
+    confidence: number;
+    reason: string;
+  } | null>(null);
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     setFile(selectedFile);
@@ -74,19 +80,55 @@ export default function ReportPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
-        console.log('GOT COORDS:', lat, lng); // ADD THIS
-        // Reverse geocode via Google Maps Geocoding API
+        console.log('GOT COORDS:', lat, lng);
         try {
           const res = await fetch(
             `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
           );
           const data = await res.json();
-          const address = data.results?.[0]?.formatted_address ?? 'Unknown location';
+          const address = data.results?.[0]?.formatted_address ?? 'Ahmedabad, Gujarat, India';
           setLocation({ lat, lng, address, city: 'Ahmedabad' });
         } catch {
           setLocation({ lat, lng, address: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, city: 'Ahmedabad' });
         }
         setGettingLocation(false);
+
+        // Duplicate detection
+        if (analysis) {
+          setCheckingDuplicate(true);
+          try {
+            const nearby = await findNearbyIssues(lat, lng, 500, analysis.category);
+            if (nearby.length > 0) {
+              const candidates = nearby.map((i) => ({
+                id: i.id,
+                title: i.title,
+                description: i.description,
+              }));
+              const result = await checkDuplicate(
+                editedTitle || analysis.title,
+                editedDesc || analysis.description,
+                candidates
+              );
+              if (result.isDuplicate && result.matchedIssueId) {
+                const matched = nearby.find((i) => i.id === result.matchedIssueId);
+                if (matched) {
+                  setDuplicateResult({
+                    issue: matched,
+                    confidence: result.confidence,
+                    reason: result.reason,
+                  });
+                  setCheckingDuplicate(false);
+                  setStep(3);
+                  return;
+                }
+              }
+            }
+          } catch {
+            // Silently fail â€” proceed to normal submit
+          }
+          setCheckingDuplicate(false);
+        }
+
         setStep(3);
       },
       () => {
@@ -94,7 +136,7 @@ export default function ReportPage() {
         setGettingLocation(false);
       }
     );
-  }, []);
+  }, [analysis, editedTitle, editedDesc]);
 
   const handleSubmit = useCallback(async () => {
     if (!file || !analysis || !location || !user) return;
@@ -253,11 +295,13 @@ export default function ReportPage() {
 
               <button
                 onClick={getLocation}
-                disabled={gettingLocation}
+                disabled={gettingLocation || checkingDuplicate}
                 className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-medium py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
               >
                 {gettingLocation ? (
                   <><Loader2 size={18} className="animate-spin" /> Getting Location...</>
+                ) : checkingDuplicate ? (
+                  <><Loader2 size={18} className="animate-spin" /> Checking for duplicates...</>
                 ) : (
                   <><MapPin size={18} /> Confirm Location</>
                 )}
@@ -272,33 +316,78 @@ export default function ReportPage() {
         <div className="space-y-4">
           <h1 className="text-2xl font-bold">Confirm & Submit</h1>
 
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-            <img src={preview} alt="Issue" className="w-full h-40 object-cover" />
-            <div className="p-4 space-y-2">
-              <h3 className="font-semibold">{editedTitle || analysis.title}</h3>
-              <p className="text-slate-400 text-sm">{editedDesc || analysis.description}</p>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <MapPin size={14} />
-                <span className="truncate">{location.address}</span>
+          {/* Duplicate Warning */}
+          {duplicateResult && (
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={18} className="text-yellow-400 flex-shrink-0" />
+                <p className="text-yellow-400 font-semibold text-sm">Similar Issue Already Reported</p>
+              </div>
+              <p className="text-slate-400 text-xs leading-relaxed">{duplicateResult.reason}</p>
+              <div className="bg-slate-900 rounded-xl p-3 border border-slate-800 flex items-center gap-3">
+                <img
+                  src={duplicateResult.issue.photoURL}
+                  alt={duplicateResult.issue.title}
+                  className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{duplicateResult.issue.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {duplicateResult.issue.verificationCount} verifications · {duplicateResult.issue.status}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => navigate(`/issue/${duplicateResult.issue.id}`)}
+                  className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2.5 rounded-xl transition-colors"
+                >
+                  ðŸ‘ Upvote Existing
+                </button>
+                <button
+                  onClick={() => setDuplicateResult(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                >
+                  Report Anyway
+                </button>
               </div>
             </div>
-          </div>
+          )}
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {/* Normal submit flow â€” shown when no duplicate or user chose Report Anyway */}
+          {!duplicateResult && (
+            <>
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                <img src={preview} alt="Issue" className="w-full h-40 object-cover" />
+                <div className="p-4 space-y-2">
+                  <h3 className="font-semibold">{editedTitle || analysis.title}</h3>
+                  <p className="text-slate-400 text-sm">{editedDesc || analysis.description}</p>
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <MapPin size={14} />
+                    <span className="truncate">{location.address}</span>
+                  </div>
+                </div>
+              </div>
 
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
-          >
-            {submitting ? (
-              <><Loader2 size={18} className="animate-spin" /> Submitting...</>
-            ) : (
-              <><CheckCircle size={18} /> Submit Issue</>
-            )}
-          </button>
+              {error && <p className="text-red-400 text-sm">{error}</p>}
+
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+              >
+                {submitting ? (
+                  <><Loader2 size={18} className="animate-spin" /> Submitting...</>
+                ) : (
+                  <><CheckCircle size={18} /> Submit Issue</>
+                )}
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+
